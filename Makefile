@@ -1,14 +1,12 @@
 CC = gcc-6
+CXX = g++-6
 
 .PHONY: all, clean
 
-all: wde wdepp
+all: wde
 
 wde: wde.c map.c
-	$(CC) wde.c map.c -o wde -Wall
-
-wdepp: wde.cc
-	$(CXX) wde.cc -o wdepp -Wall -fno-exceptions
+	$(CC) -std=c11 wde.c map.c -o wde -Wall
 
 clean:
 	rm -f wde

@@ -85,8 +85,6 @@ int map_insert(struct map *map, int key, const char *value)
 	    break;
 	}
 
-	printf("%d is already used...\n", i);
-
 	i = (i + 1) % map->capacity;
     } while (i != hash(map, key));
 

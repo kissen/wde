@@ -12,43 +12,44 @@
 #include <string>
 
 
+using namespace std;
+
+
 static const char *cmd;  // Name of the program, i.e. argv[0] if available
 
 
-/*
- * Start watching a single directory.
- */
-static int add_directory(int &fd, std::map<int, const char *> &watching, const char *path, bool initial=true)
+static int add_dir(int &fd, std::map<int, string> &watching, const char *path, bool initial=true)
 {
     // Add path if it is a directory
 
-    int watchfd;
-    uint32_t mask = IN_CREATE | IN_DELETE | IN_ONLYDIR;
+    {
+	int watchfd;
+	uint32_t mask = IN_CREATE | IN_DELETE | IN_ONLYDIR;
 
-    if ((watchfd = inotify_add_watch(fd, path, mask)) == -1) {
-	if (initial || errno != ENOTDIR) {
-	    fprintf(stderr, "%s: Adding %s failed: %s\n", cmd, path, strerror(errno));
-	    return EXIT_FAILURE;
+	if ((watchfd = inotify_add_watch(fd, path, mask)) == -1) {
+	    if (initial || errno != ENOTDIR) {
+		fprintf(stderr, "%s: Adding %s failed: %s\n", cmd, path, strerror(errno));
+		return EXIT_FAILURE;
+	    }
 	}
-    }
 
-    watching.insert(std::make_pair(watchfd, path));
+	watching.insert(std::make_pair(watchfd, path));
+    }
 
     // Add all subdirs
 
+    {
+	DIR *dir = opendir(path);
+    }
 
 
-    return EXIT_SUCCESS;
+    return 0;
 }
 
 
-/*
- * Init the program, i.e. init inotify and crawl for directories.
- * Returns EXIT_SUCCESS on success.
- */
 static int init(int argc, char **argv, int &fd, std::map<int, const char *> &watching)
 {
-    // argv[0]
+    // Set cmd, so we can have pretty error messages
 
     if (argc > 0) {
 	cmd = argv[0];
@@ -56,13 +57,12 @@ static int init(int argc, char **argv, int &fd, std::map<int, const char *> &wat
 	cmd = "wde";
     }
 
-    // Syntax
+    // If no arguments were supplied, print usage and quit
 
     if (argc <= 1) {
-	fprintf(stderr, "%s: Missing arguments\n", cmd);
+	fprintf(stderr, "%s: Missing directories\n", cmd);
 	return EXIT_FAILURE;
     }
-
 
     // Initialize inotify
 
@@ -71,10 +71,10 @@ static int init(int argc, char **argv, int &fd, std::map<int, const char *> &wat
 	return EXIT_FAILURE;
     }
 
-    // Add all directories
+    // Each user argument should be a directory that is to be watched
 
     for (int i = 1; i < argc; ++i) {
-	if (add_directory(fd, watching, argv[i]) != EXIT_SUCCESS) {
+	if (add_dir(fd, watching, argv[i]) != EXIT_SUCCESS) {
 	    return EXIT_FAILURE;
 	}
     }
@@ -154,9 +154,9 @@ static int print_changes(int fd, const std::map<int, const char *> watching)
 int main(int argc, char **argv)
 {
     int fd;
-    std::map<int, const char*> watching;
+    map<int, string> watching;
 
-    if (init(argc, argv, fd, watching) != EXIT_SUCCESS) {
+    if (init(argc, argv, fd, watching) != 0) {
 	return EXIT_FAILURE;
     }
     
