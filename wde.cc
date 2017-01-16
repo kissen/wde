@@ -36,7 +36,6 @@ static int add_directory(int &fd, std::map<int, const char *> &watching, const c
 
     // Add all subdirs
 
-    struct dirent *entr;
 
 
     return EXIT_SUCCESS;

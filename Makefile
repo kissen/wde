@@ -1,9 +1,15 @@
+CC = gcc-6
+
 .PHONY: all, clean
 
-all: wde
+all: wde wdepp
 
-wde: wde.cc
-	$(CXX) wde.cc -o wde -Wall -fno-exceptions -fdiagnostics-color=auto
+wde: wde.c map.c
+	$(CC) wde.c map.c -o wde -Wall
+
+wdepp: wde.cc
+	$(CXX) wde.cc -o wdepp -Wall -fno-exceptions
 
 clean:
 	rm -f wde
+	rm -f wdepp
