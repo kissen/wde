@@ -28,8 +28,33 @@ static int hash(const struct map *map, int key)
 }
 
 
+/*
+ * Double the capacity of map. Returns 0 on success.
+ * Runs in O(map->capacity).
+ */
 static int increase_size(struct map *map)
 {
+    struct map new = *map;
+
+    new.capacity *= 2;
+    new.items = 0;
+
+    if ((new.data = calloc(new.capacity, sizeof(struct map_entry))) == NULL) {
+	return errno;
+    }
+
+    for (size_t i = 0; i < map->capacity; ++i) {
+	struct map_entry *entry = &map->data[i];
+
+	if (entry->used) {
+	    if (map_insert(&new, entry->key, entry->value) == -1) {
+		free(new.data);
+		return errno;
+	    }
+	}
+    }
+
+    *map = new;
     return 0;
 }
 
@@ -65,8 +90,7 @@ int map_insert(struct map *map, int key, const char *value)
     // If there is no more space, allocate more memory
 
     if (map->capacity <= map->items) {
-	int err = increase_size(map);
-	if (err != 0) {
+	if (increase_size(map) != 0) {
 	    return -1;
 	}
     }
