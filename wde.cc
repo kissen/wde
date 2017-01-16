@@ -42,52 +42,58 @@ int main(int argc, char **argv)
 
     // Now keep reporting changes
 
+    static const size_t INITIAL_BUFSIZE = sizeof(struct inotify_event) + 256;
+    size_t bufsize = INITIAL_BUFSIZE;
+
     while (true) {
-	ssize_t res;
+	ssize_t rres;
+	uint8_t buf[bufsize];
 
-	// First, read the header of the event. The length of each of those events is actually
-	// different because it contains the name[] field which has dynamic length.
+	// Try reading from the inotify socket
 
-	struct {
-	    int wd;
-	    uint32_t mask;
-	    uint32_t cookie;
-	    uint32_t len;
-	} header;
+	rres = read(inotifyfd, buf, sizeof(buf));
 
-	res = read(inotifyfd, &header, sizeof(header) + 200);
+	// Reading failed
 
-	if (res == -1) {
-	    fprintf(stderr, "%s: Cannot read ionotify descriptor: %s\n", argv[0], strerror(errno));
-	    return EXIT_FAILURE;
-	} else if ((size_t) res < sizeof(header) || header.len == 0) {
-	    fprintf(stderr, "%s: Unexpected ionotify behavior\n", argv[0]);
-	    return EXIT_FAILURE;
+	if (rres == -1) {
+	    if (errno == EINVAL) {
+		// EINVAL means the buffer was too small
+		bufsize += 256;
+		continue;
+	    } else {
+		fprintf(stderr, "%s: Cannot read ionotify descriptor: %s\n", argv[0], strerror(errno));
+		return EXIT_FAILURE;
+	    }
 	}
 
-	// Now that we have the header we can read the name[] field
+	// Reading succeeded
+	// We should have gotten at least one event
+	// XXX: What if we read too few bytes?
 
-	char name[header.len];  // XXX: Dynamic Array
+	struct inotify_event *event = (struct inotify_event *) buf;
 
-	res = read(inotifyfd, name, sizeof(name));
+	while (event != NULL) {
+	    // len = 0 makes no sense because we are only watching dirs
 
-	if (res == -1) {
-	    fprintf(stderr, "%s: Cannot read ionotify descriptor: %s\n", argv[0], strerror(errno));
-	    return EXIT_FAILURE;
-	} else if ((size_t) res < sizeof(name)) {
-	    fprintf(stderr, "%s: Unexpected ionotify behavior\n", argv[0]);
-	    return EXIT_FAILURE;
-	}
+	    if (event->len == 0) {
+		fprintf(stderr, "%s: Unexpected ionotify behavior\n", argv[0]);
+		return EXIT_FAILURE;
+	    }
 
-	// Inform user of change
+	    // Output the change
 
-	if (header.mask & IN_CREATE) {
-	    printf("-> %s\n", name);
-	} else if (header.mask & IN_DELETE) {
-	    printf("<- %s\n", name);
-	} else {
-	    fprintf(stderr, "%s: Unexpected ionotify behavior\n", argv[0]);
-	    return EXIT_FAILURE;
+	    if (event->mask & IN_CREATE) {
+		printf("-> %s\n", event->name);
+	    } else if (event->mask & IN_DELETE) {
+		printf("<- %s\n", event->name);
+	    } else {
+		fprintf(stderr, "%s: Unexpected ionotify behavior\n", argv[0]);
+		return EXIT_FAILURE;
+	    }
+
+	    // There may still be another event hidden in that buffer!
+
+	    event = NULL;
 	}
     }
 }
