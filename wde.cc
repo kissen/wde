@@ -9,13 +9,45 @@
 #include <cstring>
 
 #include <map>
-#include <vector>
+#include <string>
 
 
 static const char *cmd;  // Name of the program, i.e. argv[0] if available
 
 
-static int init(int argc, char **argv, int &fd, std::map<int, char *> &watching)
+/*
+ * Start watching a single directory.
+ */
+static int add_directory(int &fd, std::map<int, const char *> &watching, const char *path, bool initial=true)
+{
+    // Add path if it is a directory
+
+    int watchfd;
+    uint32_t mask = IN_CREATE | IN_DELETE | IN_ONLYDIR;
+
+    if ((watchfd = inotify_add_watch(fd, path, mask)) == -1) {
+	if (initial || errno != ENOTDIR) {
+	    fprintf(stderr, "%s: Adding %s failed: %s\n", cmd, path, strerror(errno));
+	    return EXIT_FAILURE;
+	}
+    }
+
+    watching.insert(std::make_pair(watchfd, path));
+
+    // Add all subdirs
+
+    struct dirent *entr;
+
+
+    return EXIT_SUCCESS;
+}
+
+
+/*
+ * Init the program, i.e. init inotify and crawl for directories.
+ * Returns EXIT_SUCCESS on success.
+ */
+static int init(int argc, char **argv, int &fd, std::map<int, const char *> &watching)
 {
     // argv[0]
 
@@ -32,6 +64,7 @@ static int init(int argc, char **argv, int &fd, std::map<int, char *> &watching)
 	return EXIT_FAILURE;
     }
 
+
     // Initialize inotify
 
     if ((fd = inotify_init()) == -1) {
@@ -42,22 +75,19 @@ static int init(int argc, char **argv, int &fd, std::map<int, char *> &watching)
     // Add all directories
 
     for (int i = 1; i < argc; ++i) {
-	int watchfd;
-	uint32_t mask = IN_CREATE | IN_DELETE | IN_ONLYDIR;
-
-	if ((watchfd = inotify_add_watch(fd, argv[i], mask)) == -1) {
-	    fprintf(stderr, "%s: Adding %s failed: %s\n", cmd, argv[i], strerror(errno));
+	if (add_directory(fd, watching, argv[i]) != EXIT_SUCCESS) {
 	    return EXIT_FAILURE;
 	}
-
-	watching.insert(std::make_pair(watchfd, argv[i]));
     }
 
     return EXIT_SUCCESS;
 }
 
-
-static int print_changes(int fd, const std::map<int, char *> watching)
+/*
+ * Wait for notifications and print them on stdout.
+ * Returns after a single read(2) on fd. Return value EXIT_SUCCESS indicates success.
+ */
+static int print_changes(int fd, const std::map<int, const char *> watching)
 {
     // select(2) blocks until fd is ready for reading
 
@@ -125,7 +155,7 @@ static int print_changes(int fd, const std::map<int, char *> watching)
 int main(int argc, char **argv)
 {
     int fd;
-    std::map<int, char*> watching;
+    std::map<int, const char*> watching;
 
     if (init(argc, argv, fd, watching) != EXIT_SUCCESS) {
 	return EXIT_FAILURE;
