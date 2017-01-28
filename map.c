@@ -40,7 +40,7 @@ static int increase_size(struct map *map)
     new.items = 0;
 
     if ((new.data = calloc(new.capacity, sizeof(struct map_entry))) == NULL) {
-	return errno;
+	return -1;
     }
 
     for (size_t i = 0; i < map->capacity; ++i) {
@@ -49,12 +49,14 @@ static int increase_size(struct map *map)
 	if (entry->used) {
 	    if (map_insert(&new, entry->key, entry->value) == -1) {
 		free(new.data);
-		return errno;
+		return -1;
 	    }
 	}
     }
 
+    free(map->data);
     *map = new;
+
     return 0;
 }
 
