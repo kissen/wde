@@ -114,21 +114,24 @@ static void print_event(const struct inotify_event *event, const struct map *pat
 	exit(EXIT_FAILURE);
     }
 
-    size_t len = strlen(dir) + 1 + strlen(event->name) + 1;
-    char *full_path = xmalloc(len);
-    snprintf(full_path, len, "%s/%s", dir, event->name);
+    if (event->mask & (IN_CREATE | IN_DELETE)) {
+	size_t len = strlen(dir) + 1 + strlen(event->name) + 1;
+	char *full_path = xmalloc(len);
+	snprintf(full_path, len, "%s/%s", dir, event->name);
 
-    if (event->mask & IN_CREATE) {
-	fputs("-> ", stdout);
-    } else if (event->mask & IN_DELETE) {
-	fputs("<- ", stdout);
+	if (event->mask & IN_CREATE) {
+	    printf("-> %s\n", full_path);
+	} else if (event->mask & IN_DELETE) {
+	    printf("<- %s\n", full_path);
+	}
+
+	free(full_path);
+    } else if (event->mask & (IN_DELETE_SELF | IN_IGNORED)) {
+	printf("<- %s\n", dir);
     } else {
 	fprintf(stderr, "%s: Unexpected event mask 0x%x\n", cmd, event->mask);
 	exit(EXIT_FAILURE);
     }
-
-    puts(full_path);
-    free(full_path);
 }
 
 
