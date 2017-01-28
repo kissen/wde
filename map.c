@@ -104,11 +104,14 @@ int map_insert(struct map *map, int key, const char *value)
 
     do {
 	if (! map->data[i].used || map->data[i].key == key) {
+	    if (! map->data[i].used) {
+		map->items += 1;
+	    }
+
 	    map->data[i].key = key;
 	    map->data[i].value = value;
 	    map->data[i].used = true;
 
-	    map->items += 1;
 	    break;
 	}
 
