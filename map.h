@@ -21,10 +21,16 @@ struct map *map_init(void);
  */
 void map_destroy(struct map *map);
 
+/*
+ * Return the number of items stored in map.
+ */
+size_t map_items(const struct map *map);
+
 
 /*
- * Insert the (key, value) pair into map. Returns 0 on success or -1
- * on failure, in which case errno is set.
+ * Insert the (key, value) pair into map. If a pair with this key
+ * already exists, that pair stored in map is overwritten. Returns 0
+ * on success or -1 on failure, in which case errno is set.
  */
 int map_insert(struct map *map, int key, const char *value);
 

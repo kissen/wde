@@ -88,6 +88,12 @@ void map_destroy(struct map *map)
 }
 
 
+size_t map_items(const struct map *map)
+{
+    return map->items;
+}
+
+
 int map_insert(struct map *map, int key, const char *value)
 {
     // If there is no more space, allocate more memory

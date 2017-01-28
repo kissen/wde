@@ -105,7 +105,7 @@ static void init(int argc, char **argv, int *fd, struct map **watching)
  */
 
 
-static void print_event(const struct inotify_event *event, const struct map *paths)
+static void handle_event(const struct inotify_event *event, struct map *paths)
 {
     const char *dir;
 
@@ -128,6 +128,10 @@ static void print_event(const struct inotify_event *event, const struct map *pat
 	free(full_path);
     } else if (event->mask & (IN_DELETE_SELF | IN_IGNORED)) {
 	printf("<- %s\n", dir);
+	// We may reach this "else if" body multiple times for the
+	// same file, which is why we do not check for errors of
+	// map_remove here.
+	map_remove(paths, event->wd);
     } else {
 	fprintf(stderr, "%s: Unexpected event mask 0x%x\n", cmd, event->mask);
 	exit(EXIT_FAILURE);
@@ -176,7 +180,7 @@ static void read_and_print(int fd, struct map *watching)
 
     while (bufpos < buffer + bytes_ready) {
 	struct inotify_event *event = (struct inotify_event *) bufpos;
-	print_event(event, watching);
+	handle_event(event, watching);
 	bufpos = bufpos + sizeof(*event) + event->len;
     }
 
@@ -196,9 +200,9 @@ int main(int argc, char **argv)
 
     init(argc, argv, &fd, &watching);
 
-    while (true) {
+    while (map_items(watching) > 0) {
 	read_and_print(fd, watching);
     }
 
-    return EXIT_SUCCESS;  // never reached
+    return EXIT_SUCCESS;
 }
