@@ -75,7 +75,7 @@ static void init(int argc, char **argv, int *fd, struct map **watching)
     // Print usage if no arguments were supplied
 
     if (argc <= 1) {
-	fprintf(stderr, "%s: Missing directories\n", cmd);
+	fprintf(stderr, "usage: %s [DIRECTORY]...\n", cmd);
 	exit(EXIT_FAILURE);
     }
 
