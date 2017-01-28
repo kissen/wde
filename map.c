@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <sys/types.h>
 #include "map.h"
 
 
@@ -118,21 +119,66 @@ int map_insert(struct map *map, int key, const char *value)
 }
 
 
-const char *map_get(const struct map *map, int key)
+/*
+ * Return the index of the pair with matching key in map or -1 if no
+ * such element exists.
+ */
+static ssize_t get_index(const struct map *map, int key)
 {
     int i = hash(map, key);
 
     do {
 	if (map->data[i].used && map->data[i].key == key) {
-	    return map->data[i].value;
+	    return i;
 	}
 
 	if (! map->data[i].used) {
-	    return NULL;
+	    return -1;
 	}
 
 	i = (i + 1) % map->capacity;
     } while (i != hash(map, key));
 
-    return NULL;
+    return -1;
+}
+
+
+const char *map_get(const struct map *map, int key)
+{
+    ssize_t i = get_index(map, key);
+    return (i != -1) ? map->data[i].value : NULL;
+}
+
+
+const char *map_remove(struct map *map, int key)
+{
+    ssize_t index = get_index(map, key);
+
+    // Remove the item
+
+    if (index == -1) {
+	return NULL;
+    }
+
+    const char *ret = map->data[index].value;
+    map->data[index].used = false;
+    map->items -= 1;
+
+    // Undo linear probing
+    // O(map->capacity)
+
+    size_t i = (index + 1) % map->capacity;
+    size_t last_free = index;
+
+    while (i != index) {
+	if (map->data[i].used && hash(map, map->data[i].key) == hash(map, key)) {
+	    map->data[last_free] = map->data[i];
+	    map->data[i].used = false;
+	    last_free = i;
+	}
+
+	i = (i + 1) % map->capacity;
+    }
+
+    return ret;
 }

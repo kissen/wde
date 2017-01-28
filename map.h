@@ -1,6 +1,6 @@
 /*
- * A very simple insert-only hash map that uses linear probing for
- * storing (int, const char *) pairs.
+ * A very simple hash map that uses linear probing for storing
+ * (int, const char *) pairs.
  */
 
 
@@ -33,3 +33,10 @@ int map_insert(struct map *map, int key, const char *value);
  * Get the value for key from map or NULL if no such element exists.
  */
 const char *map_get(const struct map *map, int key);
+
+
+/*
+ * Remove and then get the value for key from map or NULL if no such
+ * element exists.
+ */
+const char *map_remove(struct map *map, int key);
