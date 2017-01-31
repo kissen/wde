@@ -1,3 +1,6 @@
+#define _XOPEN_SOURCE 700
+
+
 #include <check.h>
 #include <fcntl.h>
 #include "map.h"
@@ -238,13 +241,45 @@ static Suite *map_suite(void)
 #undef main
 
 
+/*
+ * Forward stdout and stderr to /dev/null.
+ */
 static void suppress_output(void)
 {
     int fd = open("/dev/null", O_RDWR);
     ck_assert(fd != 1);
 
-    ck_assert(dup2(fd, STDIN_FILENO) != -1);
+    ck_assert(dup2(fd, STDOUT_FILENO) != -1);
     ck_assert(dup2(fd, STDERR_FILENO) != -1);
+}
+
+
+/*
+ * Create a temp directory and write the path into buf of buflen
+ * capacity.
+ */
+static void create_temp_dir(void *buf, size_t buflen)
+{
+    snprintf(buf, buflen, "/tmp/wdetestXXXXXX");
+    ck_assert(mkdtemp(buf) != NULL);
+}
+
+
+/*
+ * Create a file named filename in dir. Note:
+ *
+ *     strlen(dir) + strlen(filename) + 2
+ *
+ * has to be smaller than 1024.
+ */
+static void create_dummy_file(const char *dir, const char *filename)
+{
+    static char buf[1024];
+
+    snprintf(buf, sizeof(buf), "%s/%s", dir, filename);
+    FILE *fp = fopen(buf, "w+");
+    ck_assert(fp != NULL);
+    ck_assert(fclose(fp) == 0);
 }
 
 
@@ -281,6 +316,107 @@ START_TEST(wde_empty_args)
 END_TEST
 
 
+START_TEST(wde_add_and_remove_dirs)
+{
+    static char dir0[1024];
+    static char dir1[1024];
+
+    create_temp_dir(dir0, sizeof(dir0));
+    create_temp_dir(dir1, sizeof(dir1));
+
+    char *argv[] = {
+	"wde",
+	dir0,
+	dir1,
+	NULL
+    };
+
+    int fd;
+    struct map *watching;
+
+    suppress_output();
+    init(3, argv, &fd, &watching);
+    ck_assert(map_items(watching) == 2);
+
+    ck_assert(rmdir(dir0) == 0);
+    ck_assert(rmdir(dir1) == 0);
+    sleep(1);
+
+    read_and_print(fd, watching);
+    ck_assert(map_items(watching) == 0);
+}
+END_TEST
+
+
+START_TEST(wde_add_files)
+{
+    static char dir0[1024];
+    static char dir1[1024];
+
+    create_temp_dir(dir0, sizeof(dir0));
+    create_temp_dir(dir1, sizeof(dir1));
+
+    char *argv[] = {
+	"wde",
+	dir0,
+	dir1,
+	NULL
+    };
+
+    int fd;
+    struct map *watching;
+
+    suppress_output();
+    init(3, argv, &fd, &watching);
+    ck_assert(map_items(watching) == 2);
+
+    create_dummy_file(dir0, "file0");
+    create_dummy_file(dir1, "file1");
+    create_dummy_file(dir0, "file2");
+    create_dummy_file(dir1, "file3");
+    sleep(1);
+
+    ck_assert(read_and_print(fd, watching) == 4);
+}
+END_TEST
+
+
+START_TEST(wde_handle_event)
+{
+    // Redirect stdout
+
+    int fd[2];
+    ck_assert(pipe(fd) == 0);
+
+    int w = fd[1];
+    int r = fd[0];
+
+    ck_assert(dup2(w, STDOUT_FILENO) != -1);
+
+    // Create matching structures and associated map
+
+    static const struct inotify_event event = {
+	.wd = 100,
+	.mask = IN_CREATE,
+	.len = 15,
+	.name = "abyz"
+    };
+
+    struct map *map = map_init();
+    ck_assert(map != NULL);
+    ck_assert(map_insert(map, event.wd, "1234") == 0);
+
+    // Check if handle_event reacts correctly
+
+    handle_event(&event, map);
+    static char outbuf[1024];
+    ck_assert(read(r, outbuf, sizeof(outbuf)) > 0);
+    outbuf[sizeof(outbuf) - 1] = 0;
+    ck_assert(strstr(outbuf, "-> 1234/abyz") != NULL);
+}
+END_TEST
+
+
 static Suite *wde_suite(void)
 {
     Suite *s = suite_create("wde");
@@ -288,6 +424,9 @@ static Suite *wde_suite(void)
 
     tcase_add_test(wde_tc, wde_init_cmd);
     tcase_add_exit_test(wde_tc, wde_empty_args, 1);
+    tcase_add_test(wde_tc, wde_add_and_remove_dirs);
+    tcase_add_test(wde_tc, wde_add_files);
+    tcase_add_test(wde_tc, wde_handle_event);
 
     suite_add_tcase(s, wde_tc);
     return s;
