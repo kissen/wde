@@ -21,6 +21,7 @@ struct map *map_init(void);
  */
 void map_destroy(struct map *map);
 
+
 /*
  * Return the number of items stored in map.
  */
