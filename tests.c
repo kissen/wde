@@ -1,4 +1,5 @@
 #include <check.h>
+#include <fcntl.h>
 #include "map.h"
 
 
@@ -236,6 +237,17 @@ static Suite *map_suite(void)
 #include "wde.c"
 #undef main
 
+
+static void suppress_output(void)
+{
+    int fd = open("/dev/null", O_RDWR);
+    ck_assert(fd != 1);
+
+    ck_assert(dup2(fd, STDIN_FILENO) != -1);
+    ck_assert(dup2(fd, STDERR_FILENO) != -1);
+}
+
+
 START_TEST(wde_init_cmd)
 {
     char *argv[] = {
@@ -263,6 +275,7 @@ START_TEST(wde_empty_args)
     int fd;
     struct map *watching;
 
+    suppress_output();
     init(1, argv, &fd, &watching);
 }
 END_TEST
