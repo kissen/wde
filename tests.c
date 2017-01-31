@@ -2,6 +2,11 @@
 #include "map.h"
 
 
+/*
+ * Tests for map.c
+ */
+
+
 static const char *DUMMY_VALUE = (char *) 0xbadf00d;
 
 
@@ -202,34 +207,96 @@ START_TEST(map_insert_removesome_insert_get)
 END_TEST
 
 
+static Suite *map_suite(void)
+{
+    Suite *s = suite_create("map");
+    TCase *map_tc = tcase_create("core");
+
+    tcase_add_test(map_tc, map_create_destroy);
+    tcase_add_test(map_tc, map_insert_items);
+    tcase_add_test(map_tc, map_insert_items_many);
+    tcase_add_test(map_tc, map_insert_removeall_items);
+    tcase_add_test(map_tc, map_insert_removeall_items_many);
+    tcase_add_test(map_tc, map_getempty);
+    tcase_add_test(map_tc, map_insert_get);
+    tcase_add_test(map_tc, map_insert_removeall_get);
+    tcase_add_test(map_tc, map_insert_removesome_get);
+    tcase_add_test(map_tc, map_insert_removesome_insert_get);
+
+    suite_add_tcase(s, map_tc);
+    return s;
+}
+
+
+/*
+ * Tests for wde.c
+ */
+
+#define main wde_main
+#include "wde.c"
+#undef main
+
+START_TEST(wde_init_cmd)
+{
+    char *argv[] = {
+	"progname",
+	"/tmp",
+	NULL
+    };
+
+    int fd;
+    struct map *watching;
+
+    init(2, argv, &fd, &watching);
+    ck_assert(cmd == argv[0]);
+}
+END_TEST
+
+
+START_TEST(wde_empty_args)
+{
+    char *argv[] = {
+	"wde",
+	NULL
+    };
+
+    int fd;
+    struct map *watching;
+
+    init(1, argv, &fd, &watching);
+}
+END_TEST
+
+
+static Suite *wde_suite(void)
+{
+    Suite *s = suite_create("wde");
+    TCase *wde_tc = tcase_create("core");
+
+    tcase_add_test(wde_tc, wde_init_cmd);
+    tcase_add_exit_test(wde_tc, wde_empty_args, 1);
+
+    suite_add_tcase(s, wde_tc);
+    return s;
+}
+
+
+/*
+ * Running tests
+ */
+
+
 int main(void)
 {
-    int failed;
+    Suite *ms = map_suite();
+    Suite *ws = wde_suite();
 
-    Suite *s;
-    SRunner *r;
-    TCase *tc;
-
-    s = suite_create("map");
-    tc = tcase_create("core");
-
-    // add tests cases
-    tcase_add_test(tc, map_create_destroy);
-    tcase_add_test(tc, map_insert_items);
-    tcase_add_test(tc, map_insert_items_many);
-    tcase_add_test(tc, map_insert_removeall_items);
-    tcase_add_test(tc, map_insert_removeall_items_many);
-    tcase_add_test(tc, map_getempty);
-    tcase_add_test(tc, map_insert_get);
-    tcase_add_test(tc, map_insert_removeall_get);
-    tcase_add_test(tc, map_insert_removesome_get);
-    tcase_add_test(tc, map_insert_removesome_insert_get);
-
-    suite_add_tcase(s, tc);
-    r = srunner_create(s);
+    SRunner *r = srunner_create(ms);
+    srunner_add_suite(r, ws);
 
     srunner_run_all(r, CK_NORMAL);
-    failed = srunner_ntests_failed(r);
+    int failed = srunner_ntests_failed(r);
     srunner_free(r);
-    return failed;
+
+    return failed == 0 ? 0 : 1;
 }
