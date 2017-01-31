@@ -23,7 +23,7 @@ struct map {
 };
 
 
-static int hash(const struct map *map, int key)
+static size_t hash(const struct map *map, int key)
 {
     return abs(key) % map->capacity;
 }
@@ -106,7 +106,7 @@ int map_insert(struct map *map, int key, const char *value)
 
     // Insert key/value pair
 
-    int i = hash(map, key);
+    size_t i = hash(map, key);
 
     do {
 	if (! map->data[i].used || map->data[i].key == key) {
@@ -134,7 +134,7 @@ int map_insert(struct map *map, int key, const char *value)
  */
 static ssize_t get_index(const struct map *map, int key)
 {
-    int i = hash(map, key);
+    size_t i = hash(map, key);
 
     do {
 	if (map->data[i].used && map->data[i].key == key) {
