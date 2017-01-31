@@ -11,7 +11,7 @@
 #include "map.h"
 
 
-static const char *cmd;  // name of the program, usually argv[0]
+static const char *cmd = "wde";  // name of the program, usually argv[0]
 
 
 /*
