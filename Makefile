@@ -1,14 +1,15 @@
-CC = gcc-6
-CFLAGS = -Wall -std=c11 -O3
+CC = gcc-4.9 -fdiagnostics-color=auto
+CFLAGS = -Wall -std=c11 -O3 -g
 
-.PHONY: clean check
+.PHONY: check clean
 
 wde: wde.c map.c
 	$(CC) $(CFLAGS) $? -o $@
 
-check: tests.c map.c
-	@$(CC) -lcheck $(CFLAGS) -Wno-main $? -o tests
+check: tests.c map.c wde.c
+	@$(CC) $(CFLAGS) -Wno-main tests.c map.c -o tests -lcheck -lm -lrt -pthread
 	@./tests
+	@rm -f tests
 
 clean:
 	rm -f wde
