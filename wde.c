@@ -139,7 +139,7 @@ static void handle_event(const struct inotify_event *event, struct map *paths)
 }
 
 
-static void read_and_print(int fd, struct map *watching)
+static size_t read_and_print(int fd, struct map *watching)
 {
     // select(2) blocks until fd is ready for reading
 
@@ -177,14 +177,18 @@ static void read_and_print(int fd, struct map *watching)
     // The read bytes can contain more than just one event
 
     uint8_t *bufpos = buffer;
+    size_t handled = 0;
 
     while (bufpos < buffer + bytes_ready) {
 	struct inotify_event *event = (struct inotify_event *) bufpos;
 	handle_event(event, watching);
 	bufpos = bufpos + sizeof(*event) + event->len;
+
+	handled += 1;
     }
 
     free(buffer);
+    return handled;
 }
 
 
