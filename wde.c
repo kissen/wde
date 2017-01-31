@@ -208,5 +208,8 @@ int main(int argc, char **argv)
 	read_and_print(fd, watching);
     }
 
+    close(fd);
+    map_destroy(watching);
+
     return EXIT_SUCCESS;
 }
