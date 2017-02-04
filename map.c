@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include "map.h"
 
@@ -11,7 +12,7 @@ static const size_t INITIAL_CAPACITY = 32;
 
 struct map_entry {
     int key;
-    const char *value;
+    char *value;
     bool used;
 };
 
@@ -26,6 +27,43 @@ struct map {
 static size_t hash(const struct map *map, int key)
 {
     return abs(key) % map->capacity;
+}
+
+
+struct map *map_init(void)
+{
+    struct map *map;
+
+    if ((map = malloc(sizeof(*map))) == NULL) {
+	return NULL;
+    }
+
+    map->capacity = INITIAL_CAPACITY;
+    map->items = 0;
+    if ((map->data = calloc(map->capacity, sizeof(struct map_entry))) == NULL) {
+	free(map);
+	return NULL;
+    }
+
+    return map;
+}
+
+
+void map_destroy(struct map *map)
+{
+    for (size_t i = 0; i < map->capacity; ++i) {
+	if (map->data[i].used) {
+	    free(map->data[i].value);
+	}
+    }
+    free(map->data);
+    free(map);
+}
+
+
+size_t map_items(const struct map *map)
+{
+    return map->items;
 }
 
 
@@ -62,38 +100,6 @@ static int increase_size(struct map *map)
 }
 
 
-struct map *map_init(void)
-{
-    struct map *map;
-
-    if ((map = malloc(sizeof(*map))) == NULL) {
-	return NULL;
-    }
-
-    map->capacity = INITIAL_CAPACITY;
-    map->items = 0;
-    if ((map->data = calloc(map->capacity, sizeof(struct map_entry))) == NULL) {
-	free(map);
-	return NULL;
-    }
-
-    return map;
-}
-
-
-void map_destroy(struct map *map)
-{
-    free(map->data);
-    free(map);
-}
-
-
-size_t map_items(const struct map *map)
-{
-    return map->items;
-}
-
-
 int map_insert(struct map *map, int key, const char *value)
 {
     // If there is no more space, allocate more memory
@@ -104,18 +110,30 @@ int map_insert(struct map *map, int key, const char *value)
 	}
     }
 
+    // Copy the string
+
+    char *cpy;
+
+    if ((cpy = malloc(strlen(value) + 1)) == NULL) {
+	return -1;
+    }
+
+    strcpy(cpy, value);
+
     // Insert key/value pair
 
     size_t i = hash(map, key);
 
     do {
 	if (! map->data[i].used || map->data[i].key == key) {
-	    if (! map->data[i].used) {
+	    if (map->data[i].used) {
+		free(map->data[i].value);
+	    } else {
 		map->items += 1;
 	    }
 
 	    map->data[i].key = key;
-	    map->data[i].value = value;
+	    map->data[i].value = cpy;
 	    map->data[i].used = true;
 
 	    break;
@@ -159,17 +177,17 @@ const char *map_get(const struct map *map, int key)
 }
 
 
-const char *map_remove(struct map *map, int key)
+const int map_remove(struct map *map, int key)
 {
     ssize_t index = get_index(map, key);
 
     // Remove the item
 
     if (index == -1) {
-	return NULL;
+	return -1;
     }
 
-    const char *ret = map->data[index].value;
+    free(map->data[index].value);
     map->data[index].used = false;
     map->items -= 1;
 
@@ -189,5 +207,5 @@ const char *map_remove(struct map *map, int key)
 	i = (i + 1) % map->capacity;
     }
 
-    return ret;
+    return 0;
 }

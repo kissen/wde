@@ -1,6 +1,6 @@
 /*
  * A very simple hash map that uses linear probing for storing
- * (int, const char *) pairs.
+ * (int, null-terminated string) pairs.
  */
 
 
@@ -29,21 +29,25 @@ size_t map_items(const struct map *map);
 
 
 /*
- * Insert the (key, value) pair into map. If a pair with this key
- * already exists, that pair stored in map is overwritten. Returns 0
- * on success or -1 on failure, in which case errno is set.
+ * Insert the (key, value) pair into map. value needs to be a
+ * null-terminated string and will be copied for the hash map. If a
+ * pair with this key already exists, that pair stored in map is
+ * overwritten. Returns 0 on success or -1 on failure, in which case
+ * errno is set.
  */
 int map_insert(struct map *map, int key, const char *value);
 
 
 /*
  * Get the value for key from map or NULL if no such element exists.
+ * Do not free the returned pointer, use map_remove() instead.
  */
 const char *map_get(const struct map *map, int key);
 
 
 /*
- * Remove and then get the value for key from map or NULL if no such
- * element exists.
+ * Remove the value for key from map. Memory allocated for that pair
+ * will be freed. Returns 0 on success and -1 if no such element could
+ * be found.
  */
-const char *map_remove(struct map *map, int key);
+const int map_remove(struct map *map, int key);

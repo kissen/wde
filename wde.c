@@ -1,4 +1,7 @@
+#define _XOPEN_SOURCE 700
+
 #include <assert.h>
+#include <dirent.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -7,6 +10,9 @@
 #include <sys/inotify.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 #include "map.h"
 
@@ -44,40 +50,112 @@ static void *xmalloc(size_t size)
  */
 
 
-static void add_dir(int fd, struct map *watching, const char *path, bool initial)
+static bool a_before_b(const struct timespec *a, const struct timespec *b)
 {
+    if (a->tv_sec == b->tv_sec) {
+	return a->tv_nsec < b->tv_nsec;
+    } else {
+	return a->tv_sec < b->tv_sec;
+    }
+}
+
+
+/*
+ * Returns true if the directory at path was modified before cutoff.
+ */
+static bool is_dir_older_than(const char *path, const struct timespec *t)
+{
+    struct stat ss;
+
+    if ((lstat(path, &ss)) == -1) {
+	fprintf(stderr, "%s: %s: %s\n", cmd, path, error());
+	return false;
+    }
+
+    return S_ISDIR(ss.st_mode) && a_before_b(&ss.st_mtim, t);
+}
+
+
+static int add_dir(int fd, struct map *watching, const char *path,
+		   struct timespec *cutoff, bool recursive)
+{
+    // Add the current directory
+
     int watchfd;
     uint32_t mask = IN_CREATE | IN_DELETE | IN_ONLYDIR;
 
     if ((watchfd = inotify_add_watch(fd, path, mask)) == -1) {
 	fprintf(stderr, "%s: Adding %s failed: %s\n", cmd, path, error());
-	exit(EXIT_FAILURE);
+	return -1;
     }
 
     if (map_insert(watching, watchfd, path) == -1) {
 	fprintf(stderr, "%s: Broken table: %s\n", cmd, error());
-	exit(EXIT_FAILURE);
+	return -1;
     }
+
+    if (! recursive) {
+	return 0;
+    }
+
+    // Scan the directory for sub-directories
+
+    DIR *dir;
+    struct dirent *ent;
+
+    if ((dir = opendir(path)) == NULL) {
+	return -1;
+    }
+
+    while (errno = 0, (ent = readdir(dir)) != NULL) {
+	if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) {
+	    continue;
+	}
+
+	size_t len = strlen(path) + 1 + strlen(ent->d_name) + 1;
+	char *full_path = xmalloc(len);
+	snprintf(full_path, len, "%s/%s", path, ent->d_name);
+	if (is_dir_older_than(full_path, cutoff)) {  // racy, but what else can you do?
+	    add_dir(fd, watching, full_path, cutoff, true);
+	}
+	free(full_path);
+    }
+
+    int ret = errno == 0 ? 0 : - 1;
+    closedir(dir);
+    return ret;
 }
 
 
 static void init(int argc, char **argv, int *fd, struct map **watching)
 {
-    // Set cmd so we can have pretty error messages that start with
-    // the program name
+    // Parse arguments
 
-    if (argc > 0) {
-	cmd = argv[0];
-    } else {
-	cmd = "wde";
+    bool recursive = false;
+
+    int c;
+    while ((c = getopt(argc, argv, "r")) != -1) {
+	switch (c) {
+	case 'r':
+	    recursive = true;
+	    break;
+
+	default:
+	    exit(EXIT_FAILURE);  // getopt shows error message
+	}
     }
 
-    // Print usage if no arguments were supplied
+    // Print usage if no directories were supplied
 
-    if (argc <= 1) {
+    if (optind == argc) {
 	fprintf(stderr, "usage: %s [DIRECTORY]...\n", cmd);
 	exit(EXIT_FAILURE);
     }
+
+    // Set cmd so we can have pretty error messages that start with
+    // the program name
+
+    cmd = argv[0];
 
     // Initialize inotify
 
@@ -95,8 +173,16 @@ static void init(int argc, char **argv, int *fd, struct map **watching)
 
     // Each user argument should be a directory that is to be watched
 
-    for (int i = 1; i < argc; ++i) {
-	add_dir(*fd, *watching, argv[i], true);
+    struct timespec now;
+    if (clock_gettime(CLOCK_REALTIME, &now) == -1) {
+	fprintf(stderr, "%s: cannot get current time: %s\n", cmd, error());
+	exit(EXIT_FAILURE);
+    }
+
+    for (int i = optind; i < argc; ++i) {
+	if (add_dir(*fd, *watching, argv[i], &now, recursive) == -1) {
+	    exit(EXIT_FAILURE);
+	}
     }
 }
 
