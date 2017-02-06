@@ -1,16 +1,23 @@
-CC = gcc-4.9 -fdiagnostics-color=auto
-CFLAGS = -Wall -std=c11 -O3 -g
+CFLAGS = -Wall -std=c11 -O3
+CPPFLAGS = -D_XOPEN_SOURCE=700
+LDFLAGS = -pthread
 
 .PHONY: check clean
 
-wde: wde.c map.c
-	$(CC) $(CFLAGS) $? -o $@
+wde: map.o wde.o
+	@echo "LD $@"
+	@$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-check: tests.c map.c wde.c
-	@$(CC) $(CFLAGS) -Wno-main tests.c map.c -o tests -lcheck -lm -lrt -pthread
+check: map.o tests.c wde.c
+	@$(CC) $(CFLAGS) -Wno-main map.o tests.c -o tests -lcheck -lm -lrt -pthread
 	@./tests
 	@rm -f tests
 
+%.o: %.c
+	@echo "CC $@"
+	@$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
+
 clean:
+	rm -f map.o tests.o wde.o
 	rm -f wde
 	rm -f tests
