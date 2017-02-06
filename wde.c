@@ -1,5 +1,3 @@
-#define _XOPEN_SOURCE 700
-
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>

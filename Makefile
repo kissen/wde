@@ -8,7 +8,7 @@ wde: map.o wde.o
 	@$(CC) $(CFLAGS) -o $@ $^
 
 check: map.o tests.c wde.c
-	@$(CC) $(CFLAGS) -Wno-main map.o tests.c -o tests -lcheck -lm -lrt -pthread
+	@$(CC) $(CFLAGS) $(CPPFLAGS) -Wno-main map.o tests.c -o tests -lcheck -lm -lrt -pthread
 	@./tests
 	@rm -f tests
 
