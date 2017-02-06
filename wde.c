@@ -129,6 +129,13 @@ static int add_dir(int fd, struct map *watching, const char *path,
 
 static void init(int argc, char **argv, int *fd, struct map **watching)
 {
+    // Set cmd so we can have pretty error messages that start with
+    // the program name
+
+    if (argc >= 1) {
+	cmd = argv[0];
+    }
+
     // Parse arguments
 
     bool recursive = false;
@@ -148,14 +155,9 @@ static void init(int argc, char **argv, int *fd, struct map **watching)
     // Print usage if no directories were supplied
 
     if (optind == argc) {
-	fprintf(stderr, "usage: %s [DIRECTORY]...\n", cmd);
+	fprintf(stderr, "usage: %s [-r] [DIRECTORY]...\n", cmd);
 	exit(EXIT_FAILURE);
     }
-
-    // Set cmd so we can have pretty error messages that start with
-    // the program name
-
-    cmd = argv[0];
 
     // Initialize inotify
 
